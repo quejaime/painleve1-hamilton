@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Surface Hamiltonienne G(x,y,t)=0 (Rouge) vs Séparatrice Réelle (Bleue) — Painlevé I</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Interpréteur LaTeX (KaTeX) ultra-rapide -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+          onload="if (window.renderLatex) window.renderLatex();"></script>
+  <!-- Three.js et OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Données 3D : Séparatrice Réelle & Nappe Hamiltonienne G(x,y,t)=0 -->
+  <script src="hamilton_data.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- Panneau de contrôle ergonomique -->
+  <aside id="ui-panel">
+    <header class="panel-header">
+      <div class="badge">WEB VIEWER HAMILTON</div>
+      <h1>Surfaces Séparatrices</h1>
+      <p class="subtitle">Séparatrice Réelle (Bleu), Goutte Gelée (Rouge) &amp; Tasse de Hubbard (Ambre/Or) ($1 \le t \le 15$)</p>
+    </header>
+
+    <div class="panel-section">
+      <h2>Couches 3D</h2>
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-real" checked>
+          <span class="color-dot real"></span>
+          <span class="layer-name">1. Séparatrice Non-Autonome (Bleue)</span>
+        </label>
+        <div class="slider-group">
+          <span class="slider-label">Opacité</span>
+          <input type="range" id="opacity-real" min="0" max="1" step="0.05" value="0.85">
+          <span class="slider-val" id="val-opacity-real">85%</span>
+        </div>
+      </div>
+
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-theo" checked>
+          <span class="color-dot theo"></span>
+          <span class="layer-name">2. Goutte Gelée $H = \frac{2}{3}t^{3/2}$ (Rouge)</span>
+        </label>
+        <div class="slider-group">
+          <span class="slider-label">Opacité</span>
+          <input type="range" id="opacity-theo" min="0" max="1" step="0.05" value="0.70">
+          <span class="slider-val" id="val-opacity-theo">70%</span>
+        </div>
+      </div>
+
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-hamilton-cup" checked>
+          <span class="color-dot cup"></span>
+          <span class="layer-name">3. Tasse de Hubbard $G \le 0$ ($x \le 0$, Or)</span>
+        </label>
+        <div class="slider-group">
+          <span class="slider-label">Opacité</span>
+          <input type="range" id="opacity-hamilton" min="0" max="1" step="0.05" value="0.85">
+          <span class="slider-val" id="val-opacity-hamilton">85%</span>
+        </div>
+      </div>
+
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-hamilton-ext" checked>
+          <span class="color-dot ext"></span>
+          <span class="layer-name">Branche Extérieure $G=0$ ($x \ge \sqrt{3t}$)</span>
+        </label>
+      </div>
+
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-center" checked>
+          <span class="color-dot center"></span>
+          <span class="layer-name">Ligne des Centres $(-\sqrt{t}, 0, t)$ (Rouge)</span>
+        </label>
+      </div>
+
+      <div class="layer-control">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-saddle" checked>
+          <span class="color-dot saddle"></span>
+          <span class="layer-name">Ligne des Selles $(\sqrt{t}, 0, t)$ (Noir)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Contours de Section ($t_{\min}$ & $t_{\max}$)</h2>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-boundary-top" checked>
+          <span>Contours sommet ($t = t_{\max} = 15$)</span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-boundary-bot" checked>
+          <span>Contours base ($t = t_{\min} = 1$)</span>
+        </label>
+      </div>
+      <div class="style-control">
+        <label for="boundary-color-mode">Style des contours</label>
+        <select id="boundary-color-mode">
+          <option value="black" selected>Noir technique pur (#000)</option>
+          <option value="surface">Couleurs des nappes</option>
+          <option value="contrast1">Réel en Noir / Théorie en Rouge / Hamilton en Or</option>
+          <option value="contrast2">Réel en Bleu / Autres en Noir</option>
+        </select>
+      </div>
+      <div class="slider-group" style="margin-top: 6px;">
+        <span class="slider-label">Épaisseur</span>
+        <input type="range" id="boundary-thickness" min="0.04" max="0.22" step="0.01" value="0.04">
+        <span class="slider-val" id="val-boundary-thickness">0.04</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Repères & Boîte</h2>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-origin-axes" checked>
+          <span>Axes à l'origine $(0, 0, 0)$</span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-box" checked>
+          <span>Boîte & graduations (noir équilibré)</span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-floor-grid" checked>
+          <span>Grille perspective au sol ($t=1$)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Mode de Rendu</h2>
+      <div class="btn-group">
+        <button class="btn" data-render="smooth">Lisse</button>
+        <button class="btn" data-render="wireframe">Filaire</button>
+        <button class="btn active" data-render="both">Mixte</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Vues Caméra</h2>
+      <div class="btn-grid">
+        <button class="btn-cam" data-cam="perspective">Perspective</button>
+        <button class="btn-cam" data-cam="diag">Plongée 3/4</button>
+        <button class="btn-cam" data-cam="top">Dessus $(x, y)$</button>
+        <button class="btn-cam" data-cam="front">Face $(x, t)$</button>
+        <button class="btn-cam" data-cam="side">Profil $(y, t)$</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h2>Outils Capture d'Écran</h2>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-white-bg" checked>
+          <span>Fond blanc pur (spécial LaTeX)</span>
+        </label>
+      </div>
+      <div class="btn-group" style="grid-template-columns: 1fr 1fr;">
+        <button class="btn btn-accent" id="btn-export-hd" title="Télécharger un PNG haute définition">📸 Capture HD</button>
+        <button class="btn" id="btn-hide-ui" title="Masquer le panneau (Raccourci: H)">👁 Masquer (H)</button>
+      </div>
+    </div>
+
+    <footer class="panel-footer">
+      <p><strong>Hamiltonien :</strong> $G(x,y,t) = \frac{y^2}{2} - \frac{x}{3}(x^2 - 3t) = 0$</p>
+      <p style="margin-top: 3px; font-size: 0.72rem; color: #475569;">Bilan d'énergie : $\frac{\mathrm{d}G}{\mathrm{d}t} = x < 0$ sur la tasse (clôture entrante)</p>
+      <p style="margin-top: 5px;">Éric Olivier & John H. Hubbard (2026)</p>
+      <p style="margin-top: 4px; font-size: 0.68rem; color: #64748b;">Raccourci clavier : <strong>H</strong> pour masquer/afficher l'interface.</p>
+    </footer>
+  </aside>
+
+  <!-- Bouton flottant pour réafficher l'interface -->
+  <button id="btn-show-ui">👁 Afficher le panneau (H)</button>
+
+  <!-- Écran de chargement -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Initialisation de la scène 3D Hamiltonienne...</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
