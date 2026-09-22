@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Surface Hamiltonienne G(x,y,t)=0 (Rouge) vs Séparatrice Réelle (Bleue) — Painlevé I</title>
+  <title>Surface Hamiltonienne G(x,y,t)=0 (Rouge) vs Séparatrice Réelle (Bleue) — Painlevé I (-3.5 ≤ t ≤ 15)</title>
   <link rel="stylesheet" href="style.css">
   <!-- Interpréteur LaTeX (KaTeX) ultra-rapide -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
@@ -22,9 +22,9 @@
   <!-- Panneau de contrôle ergonomique -->
   <aside id="ui-panel">
     <header class="panel-header">
-      <div class="badge">WEB VIEWER HAMILTON</div>
+      <div class="badge">WEB VIEWER HAMILTON ($-3.5 \le t \le 15$)</div>
       <h1>Surfaces Séparatrices</h1>
-      <p class="subtitle">Séparatrice Réelle (Bleu), Goutte Gelée (Rouge) &amp; Tasse de Hubbard (Ambre/Or) ($1 \le t \le 15$)</p>
+      <p class="subtitle">Séparatrice Réelle (Bleu), Goutte Gelée (Rouge) &amp; Tasse de Hubbard (Ambre/Or) ($-3.5 \le t \le 15$)</p>
     </header>
 
     <div class="panel-section">
@@ -33,7 +33,7 @@
         <label class="toggle-label">
           <input type="checkbox" id="toggle-real" checked>
           <span class="color-dot real"></span>
-          <span class="layer-name">1. Séparatrice Non-Autonome (Bleue)</span>
+          <span class="layer-name">1. Séparatrice Non-Autonome (Bleue, $t \in [-3.5, 15]$)</span>
         </label>
         <div class="slider-group">
           <span class="slider-label">Opacité</span>
@@ -46,7 +46,7 @@
         <label class="toggle-label">
           <input type="checkbox" id="toggle-theo" checked>
           <span class="color-dot theo"></span>
-          <span class="layer-name">2. Goutte Gelée $H = \frac{2}{3}t^{3/2}$ (Rouge)</span>
+          <span class="layer-name">2. Goutte Gelée $H = \frac{2}{3}t^{3/2}$ ($t \ge 0$, Rouge)</span>
         </label>
         <div class="slider-group">
           <span class="slider-label">Opacité</span>
@@ -59,7 +59,7 @@
         <label class="toggle-label">
           <input type="checkbox" id="toggle-hamilton-cup" checked>
           <span class="color-dot cup"></span>
-          <span class="layer-name">3. Tasse de Hubbard $G \le 0$ ($x \le 0$, Or)</span>
+          <span class="layer-name">3. Tasse de Hubbard $G \le 0$ ($t \ge 0, x \le 0$, Or)</span>
         </label>
         <div class="slider-group">
           <span class="slider-label">Opacité</span>
@@ -80,7 +80,7 @@
         <label class="toggle-label">
           <input type="checkbox" id="toggle-center" checked>
           <span class="color-dot center"></span>
-          <span class="layer-name">Ligne des Centres $(-\sqrt{t}, 0, t)$ (Rouge)</span>
+          <span class="layer-name">Ligne des Centres $(-\sqrt{t}, 0, t)$ ($t \ge 0$, Rouge)</span>
         </label>
       </div>
 
@@ -88,13 +88,13 @@
         <label class="toggle-label">
           <input type="checkbox" id="toggle-saddle" checked>
           <span class="color-dot saddle"></span>
-          <span class="layer-name">Ligne des Selles $(\sqrt{t}, 0, t)$ (Noir)</span>
+          <span class="layer-name">Ligne des Selles $(\sqrt{t}, 0, t)$ ($t \ge 0$, Noir)</span>
         </label>
       </div>
     </div>
 
     <div class="panel-section">
-      <h2>Contours de Section ($t_{\min}$ & $t_{\max}$)</h2>
+      <h2>Contours de Section</h2>
       <div class="toggle-row">
         <label class="toggle-label">
           <input type="checkbox" id="toggle-boundary-top" checked>
@@ -103,13 +103,19 @@
       </div>
       <div class="toggle-row">
         <label class="toggle-label">
+          <input type="checkbox" id="toggle-boundary-zero" checked>
+          <span>Coupe au plan critique ($t = 0$)</span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-label">
           <input type="checkbox" id="toggle-boundary-bot" checked>
-          <span>Contours base ($t = t_{\min} = 1$)</span>
+          <span>Contours base ($t = t_{\min} = -3.5$)</span>
         </label>
       </div>
       <div class="style-control">
         <label for="boundary-color-mode">Style des contours</label>
-        <select id="boundary-color-mode">
+        <select id="boundary-color-mode" class="select-styled">
           <option value="black" selected>Noir technique pur (#000)</option>
           <option value="surface">Couleurs des nappes</option>
           <option value="contrast1">Réel en Noir / Théorie en Rouge / Hamilton en Or</option>
@@ -133,6 +139,12 @@
       </div>
       <div class="toggle-row">
         <label class="toggle-label">
+          <input type="checkbox" id="toggle-zero-grid" checked>
+          <span style="color: #0284c7; font-weight: 600;">Plan critique $t = 0$ (Flottaison)</span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-label">
           <input type="checkbox" id="toggle-box" checked>
           <span>Boîte & graduations (noir équilibré)</span>
         </label>
@@ -140,7 +152,7 @@
       <div class="toggle-row">
         <label class="toggle-label">
           <input type="checkbox" id="toggle-floor-grid" checked>
-          <span>Grille perspective au sol ($t=1$)</span>
+          <span>Grille perspective au sol ($t=-3.5$)</span>
         </label>
       </div>
     </div>
@@ -180,8 +192,8 @@
     </div>
 
     <footer class="panel-footer">
-      <p><strong>Hamiltonien :</strong> $G(x,y,t) = \frac{y^2}{2} - \frac{x}{3}(x^2 - 3t) = 0$</p>
-      <p style="margin-top: 3px; font-size: 0.72rem; color: #475569;">Bilan d'énergie : $\frac{\mathrm{d}G}{\mathrm{d}t} = x < 0$ sur la tasse (clôture entrante)</p>
+      <p><strong>Extension temporelle :</strong> $t \in [-3.5, 15]$</p>
+      <p style="margin-top: 3px; font-size: 0.72rem; color: #475569;">Pour $t \le 0$, seule la nappe réelle subsiste ; la tasse et la goutte naissent en $(0,0,0)$ à $t = 0$.</p>
       <p style="margin-top: 5px;">Éric Olivier & John H. Hubbard (2026)</p>
       <p style="margin-top: 4px; font-size: 0.68rem; color: #64748b;">Raccourci clavier : <strong>H</strong> pour masquer/afficher l'interface.</p>
     </footer>
@@ -193,7 +205,7 @@
   <!-- Écran de chargement -->
   <div id="loading-overlay">
     <div class="spinner"></div>
-    <div class="loading-text">Initialisation de la scène 3D Hamiltonienne...</div>
+    <div class="loading-text">Initialisation de la scène 3D étendue ($-3.5 \le t \le 15$)...</div>
   </div>
 
   <script src="app.js"></script>

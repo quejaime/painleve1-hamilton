@@ -1,21 +1,22 @@
 /**
- * WEB VIEWER HAMILTON — COMPARATEUR 3D PAINLEVÉ I (1 ≤ t ≤ 15)
+ * WEB VIEWER HAMILTON UNIFIÉ — COMPARATEUR 3D PAINLEVÉ I (-3.5 ≤ t ≤ 15.0)
  * Surface Hamiltonienne G(x,y,t) = y^2/2 - x/3*(x^2 - 3t) = 0 (Rouge)
  * vs Surface Séparatrice Dynamique Réelle Non-Autonome (Bleue)
  *
  * Repère SO(3) canonique rigide : X = x, Y = t (vertical), Z = -y (profondeur)
- * Chiralité et orientation strictement identiques aux mathématiques et à PyVista.
+ * Maillage 100% homogène : pas Delta t = 0.10 uniforme, plancher net à y = -30.0 (Z = 30.0)
+ * Chiralité et orientation strictement conformes aux équations mathématiques.
  */
 
 let scene, camera, renderer, controls;
 let realMesh, theoMesh, cupMesh, extMesh, centerLineMesh, saddleLineMesh;
-let originAxesGroup, boxDomainGroup, floorGridGroup;
-let boundaryGroupTop, boundaryGroupBot;
+let originAxesGroup, boxDomainGroup, floorGridGroup, zeroGridGroup;
+let boundaryGroupTop, boundaryGroupBot, boundaryGroupZero;
 
-let currentRenderMode = "both"; // "both" (Mixte) par défaut comme demandé
-let boxRadius = 0.045; // Épaisseur affinée élégante
-let boundaryRadius = 0.04; // Taille minimale par défaut (0.04) comme demandé
-let boundaryColorMode = "black"; // "noir technique" (#000) par défaut comme demandé
+let currentRenderMode = "both"; // "both" (Mixte) par défaut
+let boxRadius = 0.045;          // Épaisseur affinée élégante
+let boundaryRadius = 0.04;      // Taille minimale par défaut (0.04)
+let boundaryColorMode = "black";// "noir technique" (#000) par défaut
 
 // Matériaux des nappes
 let matRealSmooth, matRealBack, matRealFront, matRealWire;
@@ -27,16 +28,16 @@ let matBoundaryReal, matBoundaryTheo, matBoundaryHamilton;
 const matBoxBlack = new THREE.MeshBasicMaterial({ color: 0x050505 });
 const matTickBlack = new THREE.MeshBasicMaterial({ color: 0x050505 });
 
-// Bounding Box du domaine d'étude
+// Bounding Box du domaine d'étude (-3.5 <= t <= 15.0, x in [-8, 12.5], y in [-30, 13])
 const BOX_BOUNDS = {
-  minX: -8.0, maxX: 11.0,
-  minY: 1.0,  maxY: 15.0, // t vertical
-  minZ: -13.0, maxZ: 24.0 // Z = -y (vitesse y in [-24, 13])
+  minX: -8.0, maxX: 12.5,
+  minY: -3.5, maxY: 15.0, // t vertical étendu
+  minZ: -13.0, maxZ: 30.0 // Z = -y (vitesse y in [-30, 13])
 };
 const BOX_CENTER = new THREE.Vector3(
-  (BOX_BOUNDS.minX + BOX_BOUNDS.maxX) / 2, // 1.5
-  (BOX_BOUNDS.minY + BOX_BOUNDS.maxY) / 2, // 8.0
-  (BOX_BOUNDS.minZ + BOX_BOUNDS.maxZ) / 2  // 5.5
+  (BOX_BOUNDS.minX + BOX_BOUNDS.maxX) / 2, // 2.25
+  (BOX_BOUNDS.minY + BOX_BOUNDS.maxY) / 2, // 5.75
+  (BOX_BOUNDS.minZ + BOX_BOUNDS.maxZ) / 2  // 8.50
 );
 
 // ============================================================
@@ -94,7 +95,7 @@ function init() {
   // 2. Caméra Perspective
   const aspect = window.innerWidth / window.innerHeight;
   camera = new THREE.PerspectiveCamera(42, aspect, 0.1, 1000);
-  camera.position.set(-42, 38, 62);
+  camera.position.set(-42, 34, 64);
 
   // 3. Renderer WebGL avec ombrage doux et antialiasing
   renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -140,7 +141,7 @@ function setupLighting() {
   scene.add(ambLight);
 
   const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.85);
-  dirLight1.position.set(45, 60, 45);
+  dirLight1.position.set(45, 65, 45);
   scene.add(dirLight1);
 
   const dirLight2 = new THREE.DirectionalLight(0xf1f5f9, 0.55);
@@ -148,12 +149,12 @@ function setupLighting() {
   scene.add(dirLight2);
 
   const dirLight3 = new THREE.DirectionalLight(0xffffff, 0.40);
-  dirLight3.position.set(0, 40, -50);
+  dirLight3.position.set(0, 45, -50);
   scene.add(dirLight3);
 }
 
 function initMaterials() {
-  // 1. Surface Réelle Non-Autonome (Bleu Royal) — Rendu 2 passes (BackSide / FrontSide)
+  // 1. Surface Réelle Non-Autonome (Bleu Royal) — Rendu 2 passes
   matRealBack = new THREE.MeshStandardMaterial({
     color: 0x1d4ed8,
     roughness: 0.40,
@@ -349,7 +350,6 @@ function createMeshGroup(data, smoothMat, wireMat) {
 
 /**
  * Création d'un maillage transparent à deux passes (Face arrière puis Face avant).
- * Élimine à 100% les artefacts d'auto-occlusion Z-buffer et d'inversion de profondeur de Three.js.
  */
 function createTwoPassMeshGroup(data, matBack, matFront, wireMat, orderBack = 1, orderFront = 4) {
   const geom = new THREE.BufferGeometry();
@@ -359,13 +359,13 @@ function createTwoPassMeshGroup(data, matBack, matFront, wireMat, orderBack = 1,
 
   const group = new THREE.Group();
 
-  // 1. Face Arrière (dessinée en premier)
+  // 1. Face Arrière
   const meshBack = new THREE.Mesh(geom, matBack);
   meshBack.name = "smooth";
   meshBack.renderOrder = orderBack;
   group.add(meshBack);
 
-  // 2. Face Avant (dessinée après les objets intérieurs)
+  // 2. Face Avant
   const meshFront = new THREE.Mesh(geom, matFront);
   meshFront.name = "smooth";
   meshFront.renderOrder = orderFront;
@@ -381,20 +381,23 @@ function createTwoPassMeshGroup(data, matBack, matFront, wireMat, orderBack = 1,
 }
 
 /**
- * Création d'étiquettes de texte haute fidélité (Canvas 512x128) avec contour blanc anti-collision
+ * Création d'étiquettes de texte haute fidélité (Canvas 512x128)
+ * Fond 100% transparent avec depthWrite: false pour préserver intégralement les surfaces 3D
  */
 function createTextSprite(text, color = "#050505", fontSize = 38, scale = 4.05, withHalo = true) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 128;
   const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   ctx.font = `bold ${fontSize * 2}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   if (withHalo) {
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.96)";
-    ctx.lineWidth = 13;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+    ctx.lineWidth = 5;
     ctx.lineJoin = "round";
     ctx.strokeText(text, 256, 64);
   }
@@ -404,8 +407,15 @@ function createTextSprite(text, color = "#050505", fontSize = 38, scale = 4.05, 
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
-  const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false, // CRITIQUE : n'écrit pas dans le Z-buffer, ne masque JAMAIS les surfaces en arrière-plan
+    depthTest: true,   // Respecte l'occlusion normale si un objet opaque est devant
+    alphaTest: 0.02    // Découpe matérielle GPU immédiate : les pixels vides du canvas (alpha < 0.02) sont jetés
+  });
   const sprite = new THREE.Sprite(spriteMat);
+  sprite.renderOrder = 999; // Toujours rendu après les surfaces transparentes pour un fondu parfait
   sprite.scale.set(scale, scale * 0.25, 1);
   return sprite;
 }
@@ -444,7 +454,9 @@ function extractPolylinePoints(vertices, startIdx, count, step = 1) {
   const pts = [];
   for (let i = 0; i < count; i += step) {
     const idx = (startIdx + i) * 3;
-    pts.push(new THREE.Vector3(vertices[idx], vertices[idx + 1], vertices[idx + 2]));
+    if (idx + 2 < vertices.length) {
+      pts.push(new THREE.Vector3(vertices[idx], vertices[idx + 1], vertices[idx + 2]));
+    }
   }
   return pts;
 }
@@ -460,11 +472,11 @@ function buildSceneObjects() {
   const data = window.HAMILTON_DATA;
   if (!data) return;
 
-  // 1. Surface Réelle (Bleue) : BackSide en order 1, FrontSide en order 7
+  // 1. Surface Réelle (Bleue) sur t in [-3.5, 15.0]
   realMesh = createTwoPassMeshGroup(data.real, matRealBack, matRealFront, matRealWire, 1, 7);
   scene.add(realMesh);
 
-  // 2. Goutte Gelée Théorique (Rouge Rubis) : BackSide en order 2, FrontSide en order 6
+  // 2. Goutte Gelée Théorique (Rouge Rubis) sur t in [0.0, 15.0]
   if (data.theo) {
     theoMesh = new THREE.Group();
     const theoMain = createTwoPassMeshGroup(data.theo.main, matTheoBack, matTheoFront, matTheoWire, 2, 6);
@@ -474,63 +486,60 @@ function buildSceneObjects() {
     scene.add(theoMesh);
   }
 
-  // 3. Surface Hamiltonienne G(x,y,t)=0 (Ambre / Or)
-  // A. Tasse de Hubbard (x <= 0) : BackSide en order 3, FrontSide en order 5
+  // 3. Surface Hamiltonienne G(x,y,t)=0 sur t in [0.0, 15.0]
   cupMesh = createTwoPassMeshGroup(data.hamilton.cup, matCupBack, matCupFront, matCupWire, 3, 5);
   scene.add(cupMesh);
 
-  // B. Branche Extérieure (x >= sqrt(3t)) : order 4
-  extMesh = createMeshGroup(data.hamilton.exterior, matExtSmooth, matExtWire);
-  extMesh.renderOrder = 4;
-  if (extMesh.children) {
-    extMesh.children.forEach(c => { c.renderOrder = 4; });
+  if (data.hamilton.exterior) {
+    extMesh = createTwoPassMeshGroup(data.hamilton.exterior, matExtSmooth, matExtSmooth, matExtWire, 0, 0);
+    scene.add(extMesh);
   }
-  scene.add(extMesh);
 
-  // 4. Ligne des centres (-sqrt(t), 0, t) rouge (0 <= t <= 19.50)
+  // 4. Ligne des centres (-sqrt(t), 0, t)
   buildCenterCurve();
 
-  // 5. Ligne des Selles (sqrt(t), 0, t) noire (0 <= t <= 19.50)
+  // 5. Ligne des selles (+sqrt(t), 0, t)
   buildSaddleCurve();
 
-  // 6. Contours de section t_min et t_max
+  // 6. Contours de section remarquables
   buildBoundaryCurves();
 
-  // 7. Repère Cartésien issu de (0, 0, 0)
+  // 7. Axes issus de (0,0,0)
   buildOriginAxes();
 
-  // 8. Boîte 3D cylindrique noire + Graduations denses +50%
+  // 8. Boîte 3D cylindrique noire + Graduations sur [-3.5, 15.0]
   buildDomainBox();
 
-  // 9. Grille perspective au sol (t = 1)
+  // 9. Grille perspective au sol (t = -3.5)
   buildFloorGrid();
 
-  // 10. Appliquer le mode de rendu par défaut ("both" = Mixte)
+  // 10. Grille de flottaison / plan critique (t = 0.0)
+  buildZeroGrid();
+
+  // 11. Appliquer le mode de rendu par défaut ("both" = Mixte)
   updateRenderMode(currentRenderMode);
 }
 
 /**
- * Ligne des centres (-sqrt(t), 0, t) tracée en rouge vif pour 0 <= t <= 1.30 * t_max (19.50).
- * Exactement même épaisseur (boundaryRadius) et même étendue que la ligne des selles (sqrt(t), 0, t).
+ * Ligne des centres (-sqrt(t), 0, t) pour 0.0 <= t <= 26.0.
  */
 function buildCenterCurve() {
   if (centerLineMesh) scene.remove(centerLineMesh);
 
   const tMax = (BOX_BOUNDS && BOX_BOUNDS.maxY) ? BOX_BOUNDS.maxY : 15.0;
-  const tEnd = tMax * 1.30; // 19.50
+  const tEnd = tMax; // Clamping au plafond net de la boîte (t = 15.0)
   const maxU = Math.sqrt(tEnd);
-  const numPts = 200;
+  const numPts = 240;
   const pts = [];
 
   for (let i = 0; i <= numPts; i++) {
     const u = (i / numPts) * maxU;
     const t = u * u;
-    // Repère Three.js : X = x = -u = -sqrt(t), Y = t, Z = -y = 0
     pts.push(new THREE.Vector3(-u, t, 0));
   }
 
   const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
-  const tubeGeom = new THREE.TubeGeometry(curve, 240, boundaryRadius, 14, false);
+  const tubeGeom = new THREE.TubeGeometry(curve, 260, boundaryRadius, 14, false);
 
   const group = new THREE.Group();
   const tubeMesh = new THREE.Mesh(tubeGeom, matCenter);
@@ -550,16 +559,15 @@ function buildCenterCurve() {
 }
 
 /**
- * Ligne des selles (sqrt(t), 0, t) tracée en noir pur pour 0 <= t <= 1.30 * t_max (19.50).
- * Même épaisseur (boundaryRadius) que les bords de surface.
+ * Ligne des selles (sqrt(t), 0, t) pour 0.0 <= t <= 15.0.
  */
 function buildSaddleCurve() {
   if (saddleLineMesh) scene.remove(saddleLineMesh);
 
   const tMax = (BOX_BOUNDS && BOX_BOUNDS.maxY) ? BOX_BOUNDS.maxY : 15.0;
-  const tEnd = tMax * 1.30; // 19.50
+  const tEnd = tMax; // Clamping au plafond net de la boîte (t = 15.0)
   const maxU = Math.sqrt(tEnd);
-  const numPts = 200;
+  const numPts = 240;
   const pts = [];
 
   for (let i = 0; i <= numPts; i++) {
@@ -569,7 +577,7 @@ function buildSaddleCurve() {
   }
 
   const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
-  const tubeGeom = new THREE.TubeGeometry(curve, 240, boundaryRadius, 14, false);
+  const tubeGeom = new THREE.TubeGeometry(curve, 260, boundaryRadius, 14, false);
 
   const group = new THREE.Group();
   const tubeMesh = new THREE.Mesh(tubeGeom, matSaddle);
@@ -589,7 +597,7 @@ function buildSaddleCurve() {
 }
 
 /**
- * Contours de section dans le plan t = t_max = 15 et dans le plan t = t_min = 1
+ * Contours de section : sommet t = 15.0, base t = -3.5, et plancher de bifurcation t = 0.0
  */
 function buildBoundaryCurves() {
   const data = window.HAMILTON_DATA;
@@ -599,53 +607,41 @@ function buildBoundaryCurves() {
 
   if (boundaryGroupTop) scene.remove(boundaryGroupTop);
   if (boundaryGroupBot) scene.remove(boundaryGroupBot);
+  if (boundaryGroupZero) scene.remove(boundaryGroupZero);
 
   boundaryGroupTop = new THREE.Group();
   boundaryGroupBot = new THREE.Group();
+  boundaryGroupZero = new THREE.Group();
 
   const nThetaCup = data.metadata.n_theta_cup || 200;
-  const nFramesCup = data.metadata.n_frames_cup || 80;
-  const nFramesReal = data.metadata.n_frames_real || 56;
+  const nFramesCup = data.metadata.n_frames_cup || 100;
+  const nFramesReal = data.metadata.n_frames_real || 95;
   const nFramesExt = data.metadata.n_frames_ext || 160;
   const nPtsExt = data.metadata.n_pts_ext || 241;
 
   // ============================================================
-  // A. PLAN SOMMET (t = t_max = 15)
+  // A. PLAN SOMMET (t = t_max = 20)
   // ============================================================
-  // 1. Courbe Réelle au sommet
-  const topRealPts = extractPolylinePoints(
-    data.real.vertices,
-    (nFramesReal - 1) * 500,
-    500,
-    3
-  );
+  const topRealPts = extractPolylinePoints(data.real.vertices, (nFramesReal - 1) * 500, 500, 3);
   const meshTopReal = createSmoothTube(topRealPts, boundaryRadius, matBoundaryReal, 200, false);
   if (meshTopReal) {
     meshTopReal.name = "boundary-real";
     boundaryGroupTop.add(meshTopReal);
   }
 
-  // 2. Courbe Goutte Gelée au sommet (Main + Bot)
   if (data.theo) {
-    const nFramesTheo = data.metadata.n_frames_theo || 60;
-    const topTheoMainPts = extractPolylinePoints(
-      data.theo.main.vertices,
-      (nFramesTheo - 1) * 250,
-      250,
-      2
-    );
+    const nFramesTheo = data.metadata.n_frames_theo || 70;
+    const nUMain = data.metadata.n_u_main_theo || 250;
+    const nUBot = data.metadata.n_u_bot_theo || 120;
+
+    const topTheoMainPts = extractPolylinePoints(data.theo.main.vertices, (nFramesTheo - 1) * nUMain, nUMain, 2);
     const meshTopTheoMain = createSmoothTube(topTheoMainPts, boundaryRadius, matBoundaryTheo, 160, false);
     if (meshTopTheoMain) {
       meshTopTheoMain.name = "boundary-theo";
       boundaryGroupTop.add(meshTopTheoMain);
     }
 
-    const topTheoBotPts = extractPolylinePoints(
-      data.theo.bot.vertices,
-      (nFramesTheo - 1) * 120,
-      120,
-      2
-    );
+    const topTheoBotPts = extractPolylinePoints(data.theo.bot.vertices, (nFramesTheo - 1) * nUBot, nUBot, 2);
     const meshTopTheoBot = createSmoothTube(topTheoBotPts, boundaryRadius, matBoundaryTheo, 90, false);
     if (meshTopTheoBot) {
       meshTopTheoBot.name = "boundary-theo";
@@ -661,26 +657,14 @@ function buildBoundaryCurves() {
     }
   }
 
-  // 3. Courbe Tasse Hamilton au sommet (boucle fermée dans le plan t = 15)
-  const topCupPts = extractPolylinePoints(
-    data.hamilton.cup.vertices,
-    (nFramesCup - 1) * nThetaCup,
-    nThetaCup,
-    1
-  );
+  const topCupPts = extractPolylinePoints(data.hamilton.cup.vertices, (nFramesCup - 1) * nThetaCup, nThetaCup, 1);
   const meshTopCup = createSmoothTube(topCupPts, boundaryRadius, matBoundaryHamilton, 180, true);
   if (meshTopCup) {
     meshTopCup.name = "boundary-cup";
     boundaryGroupTop.add(meshTopCup);
   }
 
-  // 4. Courbe Branche Extérieure au sommet (ligne solide ouverte dans le plan t = 15)
-  const topExtPts = extractPolylinePoints(
-    data.hamilton.exterior.vertices,
-    (nFramesExt - 1) * nPtsExt,
-    nPtsExt,
-    1
-  );
+  const topExtPts = extractPolylinePoints(data.hamilton.exterior.vertices, (nFramesExt - 1) * nPtsExt, nPtsExt, 1);
   const meshTopExt = createSmoothTube(topExtPts, boundaryRadius, matBoundaryHamilton, 200, false);
   if (meshTopExt) {
     meshTopExt.name = "boundary-ext";
@@ -690,9 +674,9 @@ function buildBoundaryCurves() {
   scene.add(boundaryGroupTop);
 
   // ============================================================
-  // B. PLAN BASE (t = t_min = 1)
+  // B. PLAN BASE (t = t_min = -3.5)
   // ============================================================
-  // 1. Courbe Réelle à la base
+  // Seule la nappe réelle s'étend jusqu'à t = -3.5 !
   const botRealPts = extractPolylinePoints(data.real.vertices, 0, 500, 3);
   const meshBotReal = createSmoothTube(botRealPts, boundaryRadius, matBoundaryReal, 200, false);
   if (meshBotReal) {
@@ -700,61 +684,34 @@ function buildBoundaryCurves() {
     boundaryGroupBot.add(meshBotReal);
   }
 
-  // 2. Courbe Goutte Gelée à la base (Main + Bot)
-  if (data.theo) {
-    const botTheoMainPts = extractPolylinePoints(data.theo.main.vertices, 0, 250, 2);
-    const meshBotTheoMain = createSmoothTube(botTheoMainPts, boundaryRadius, matBoundaryTheo, 160, false);
-    if (meshBotTheoMain) {
-      meshBotTheoMain.name = "boundary-theo";
-      boundaryGroupBot.add(meshBotTheoMain);
-    }
-
-    const botTheoBotPts = extractPolylinePoints(data.theo.bot.vertices, 0, 120, 2);
-    const meshBotTheoBot = createSmoothTube(botTheoBotPts, boundaryRadius, matBoundaryTheo, 90, false);
-    if (meshBotTheoBot) {
-      meshBotTheoBot.name = "boundary-theo";
-      boundaryGroupBot.add(meshBotTheoBot);
-    }
-
-    if (botTheoMainPts.length > 0) {
-      const sGeom = new THREE.SphereGeometry(boundaryRadius * 1.3, 12, 12);
-      const s2 = new THREE.Mesh(sGeom, matBoundaryTheo);
-      s2.name = "boundary-theo";
-      s2.position.copy(botTheoMainPts[0]);
-      boundaryGroupBot.add(s2);
-    }
-  }
-
-  // 3. Courbe Tasse Hamilton à la base (boucle fermée dans le plan t = 1)
-  const botCupPts = extractPolylinePoints(data.hamilton.cup.vertices, 0, nThetaCup, 1);
-  const meshBotCup = createSmoothTube(botCupPts, boundaryRadius, matBoundaryHamilton, 180, true);
-  if (meshBotCup) {
-    meshBotCup.name = "boundary-cup";
-    boundaryGroupBot.add(meshBotCup);
-  }
-
-  // 4. Courbe Branche Extérieure à la base (ligne solide ouverte dans le plan t = 1)
-  const botExtPts = extractPolylinePoints(
-    data.hamilton.exterior.vertices,
-    0,
-    nPtsExt,
-    1
-  );
-  const meshBotExt = createSmoothTube(botExtPts, boundaryRadius, matBoundaryHamilton, 200, false);
-  if (meshBotExt) {
-    meshBotExt.name = "boundary-ext";
-    boundaryGroupBot.add(meshBotExt);
-  }
-
   scene.add(boundaryGroupBot);
+
+  // ============================================================
+  // C. PLAN CRITIQUE (t = 0.0) : Coupe de passage
+  // ============================================================
+  // Recherche adaptative de la tranche la plus proche de t = 0.0
+  let zeroFrameIdx = 0;
+  let minDiffZero = 1e9;
+  for (let f = 0; f < nFramesReal; f++) {
+    const tVal = data.real.vertices[f * 500 * 3 + 1];
+    if (Math.abs(tVal) < minDiffZero) {
+      minDiffZero = Math.abs(tVal);
+      zeroFrameIdx = f;
+    }
+  }
+  const zeroRealPts = extractPolylinePoints(data.real.vertices, zeroFrameIdx * 500, 500, 3);
+  const meshZeroReal = createSmoothTube(zeroRealPts, boundaryRadius * 0.9, matBoundaryReal, 200, false);
+  if (meshZeroReal) {
+    meshZeroReal.name = "boundary-zero";
+    boundaryGroupZero.add(meshZeroReal);
+  }
+  scene.add(boundaryGroupZero);
 
   updateLayerVisibility();
 }
 
 /**
  * Axes (x, y, t) issus de l'origine (0, 0, 0)
- * Même épaisseur fine et couleur noire que la boîte, flèches en cône 3D,
- * axe X calibré à 19.80, axe T à 19.50, axe Y à 16.90.
  */
 function buildOriginAxes() {
   originAxesGroup = new THREE.Group();
@@ -767,11 +724,11 @@ function buildOriginAxes() {
   originAxesGroup.add(sphere);
 
   const labelO = createTextSprite("(0,0,0)", "#050505", 28, 4.2, true);
-  labelO.position.set(0, -1.0, 0);
+  labelO.position.set(0, 0.4, -0.6);
   originAxesGroup.add(labelO);
 
-  // 1. Axe +X (Position x) : calibré à 19.80 (dépasse de 6 unités les graduations y)
-  const lenX = 19.80;
+  // 1. Axe +X : longueur 20.0
+  const lenX = 20.0;
   const arrowX = createArrow3D(origin, new THREE.Vector3(1, 0, 0), lenX, boxRadius, matBoxBlack, 1.35, boxRadius * 3.1);
   originAxesGroup.add(arrowX);
 
@@ -786,8 +743,8 @@ function buildOriginAxes() {
   negXLine.computeLineDistances();
   originAxesGroup.add(negXLine);
 
-  // 2. Axe +T (Temps vertical t) : sort de 30% -> 19.50
-  const lenT = 19.50;
+  // 2. Axe +T (Temps vertical vers le haut) : longueur 19.5 (t_max = 15.0 + 30%)
+  const lenT = 19.5;
   const arrowT = createArrow3D(origin, new THREE.Vector3(0, 1, 0), lenT, boxRadius, matBoxBlack, 1.3, boxRadius * 3.0);
   originAxesGroup.add(arrowT);
 
@@ -795,8 +752,15 @@ function buildOriginAxes() {
   labelT.position.set(0, lenT + 2.0, 0);
   originAxesGroup.add(labelT);
 
-  // 3. Axe +Y (Vitesse y, orienté vers -Z dans Three.js) : sort de 30% -> 16.90
-  const lenY = 16.90;
+  // Axe négatif -T (vers le bas jusqu'à t = -4.8)
+  const lenNegT = 4.8;
+  const negTGeom = new THREE.BufferGeometry().setFromPoints([origin, new THREE.Vector3(0, -lenNegT, 0)]);
+  const negTLine = new THREE.Line(negTGeom, new THREE.LineDashedMaterial({ color: 0x050505, dashSize: 0.4, gapSize: 0.25, opacity: 0.60, transparent: true }));
+  negTLine.computeLineDistances();
+  originAxesGroup.add(negTLine);
+
+  // 3. Axe +Y (Vitesse y vers -Z) : longueur 17.0
+  const lenY = 17.0;
   const arrowY = createArrow3D(origin, new THREE.Vector3(0, 0, -1), lenY, boxRadius, matBoxBlack, 1.3, boxRadius * 3.0);
   originAxesGroup.add(arrowY);
 
@@ -815,7 +779,7 @@ function buildOriginAxes() {
 }
 
 /**
- * Boîte 3D cylindrique noire avec graduations denses et bien visibles (+50% taille)
+ * Boîte 3D cylindrique noire graduée sur [-3.5, 15.0]
  */
 function buildDomainBox() {
   if (boxDomainGroup) scene.remove(boxDomainGroup);
@@ -853,7 +817,7 @@ function buildDomainBox() {
   });
 
   // --- GRADUATIONS AXE X (Position, arête basse avant : Y=minY, Z=maxZ) ---
-  const xMajorTicks = [-6, -4, -2, 0, 2, 4, 6, 8, 10];
+  const xMajorTicks = [-6, -4, -2, 0, 2, 4, 6, 8, 10, 12];
   xMajorTicks.forEach(val => {
     if (val >= minX && val <= maxX) {
       const p1 = new THREE.Vector3(val, minY, maxZ);
@@ -867,7 +831,7 @@ function buildDomainBox() {
     }
   });
 
-  const xMinorTicks = [-7, -5, -3, -1, 1, 3, 5, 7, 9];
+  const xMinorTicks = [-7, -5, -3, -1, 1, 3, 5, 7, 9, 11];
   xMinorTicks.forEach(val => {
     if (val >= minX && val <= maxX) {
       const p1 = new THREE.Vector3(val, minY, maxZ);
@@ -878,7 +842,7 @@ function buildDomainBox() {
   });
 
   // --- GRADUATIONS AXE T (Temps vertical, arête avant gauche : X=minX, Z=maxZ) ---
-  const tMajorTicks = [1, 3, 5, 7, 9, 11, 13, 15];
+  const tMajorTicks = [-3, -2, -1, 0, 2, 4, 6, 8, 10, 12, 14];
   tMajorTicks.forEach(val => {
     if (val >= minY && val <= maxY) {
       const p1 = new THREE.Vector3(minX, val, maxZ);
@@ -892,7 +856,7 @@ function buildDomainBox() {
     }
   });
 
-  const tMinorTicks = [2, 4, 6, 8, 10, 12, 14];
+  const tMinorTicks = [-3.5, -2.5, -1.5, -0.5, 1, 3, 5, 7, 9, 11, 13, 15];
   tMinorTicks.forEach(val => {
     if (val >= minY && val <= maxY) {
       const p1 = new THREE.Vector3(minX, val, maxZ);
@@ -903,7 +867,7 @@ function buildDomainBox() {
   });
 
   // --- GRADUATIONS AXE Y (Vitesse, arête basse droite : X=maxX, Y=minY) ---
-  const yMajorTicks = [-20, -15, -10, -5, 0, 5, 10];
+  const yMajorTicks = [-30, -25, -20, -15, -10, -5, 0, 5, 10];
   yMajorTicks.forEach(yVal => {
     const zVal = -yVal;
     if (zVal >= minZ && zVal <= maxZ) {
@@ -918,7 +882,7 @@ function buildDomainBox() {
     }
   });
 
-  const yMinorTicks = [-22.5, -17.5, -12.5, -7.5, -2.5, 2.5, 7.5, 12.5];
+  const yMinorTicks = [-28, -22, -18, -12, -8, -2, 3, 8, 13];
   yMinorTicks.forEach(yVal => {
     const zVal = -yVal;
     if (zVal >= minZ && zVal <= maxZ) {
@@ -933,7 +897,7 @@ function buildDomainBox() {
 }
 
 /**
- * Grille perspective au sol (t = 1)
+ * Grille perspective au sol (t = -3.5)
  */
 function buildFloorGrid() {
   if (floorGridGroup) scene.remove(floorGridGroup);
@@ -958,7 +922,7 @@ function buildFloorGrid() {
     floorGridGroup.add(line);
   });
 
-  [-20, -15, -10, -5, 0, 5, 10].forEach(yVal => {
+  [-30, -25, -20, -15, -10, -5, 0, 5, 10].forEach(yVal => {
     const zVal = -yVal;
     const geom = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(minX, minY, zVal),
@@ -970,6 +934,46 @@ function buildFloorGrid() {
   });
 
   scene.add(floorGridGroup);
+}
+
+/**
+ * NOUVEAU : Grille du plan critique t = 0.0 (Bifurcation / Flottaison)
+ */
+function buildZeroGrid() {
+  if (zeroGridGroup) scene.remove(zeroGridGroup);
+  zeroGridGroup = new THREE.Group();
+
+  const { minX, maxX, minZ, maxZ } = BOX_BOUNDS;
+  const gridMat = new THREE.LineDashedMaterial({
+    color: 0x0284c7, // Cyan dense
+    dashSize: 0.8,
+    gapSize: 0.5,
+    transparent: true,
+    opacity: 0.45
+  });
+
+  [-6, -4, -2, 0, 2, 4, 6, 8, 10].forEach(xVal => {
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(xVal, 0.0, minZ),
+      new THREE.Vector3(xVal, 0.0, maxZ)
+    ]);
+    const line = new THREE.Line(geom, gridMat);
+    line.computeLineDistances();
+    zeroGridGroup.add(line);
+  });
+
+  [-20, -15, -10, -5, 0, 5, 10].forEach(yVal => {
+    const zVal = -yVal;
+    const geom = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(minX, 0.0, zVal),
+      new THREE.Vector3(maxX, 0.0, zVal)
+    ]);
+    const line = new THREE.Line(geom, gridMat);
+    line.computeLineDistances();
+    zeroGridGroup.add(line);
+  });
+
+  scene.add(zeroGridGroup);
 }
 
 function updateRenderMode(mode) {
@@ -996,8 +1000,10 @@ function updateLayerVisibility() {
 
   const toggleTop = document.getElementById("toggle-boundary-top");
   const toggleBot = document.getElementById("toggle-boundary-bot");
+  const toggleZeroBoundary = document.getElementById("toggle-boundary-zero");
   const showTop = toggleTop ? toggleTop.checked : true;
   const showBot = toggleBot ? toggleBot.checked : true;
+  const showZeroBoundary = toggleZeroBoundary ? toggleZeroBoundary.checked : true;
 
   if (realMesh) realMesh.visible = showReal;
   if (theoMesh) theoMesh.visible = showTheo;
@@ -1022,14 +1028,11 @@ function updateLayerVisibility() {
   if (boundaryGroupBot) {
     boundaryGroupBot.visible = showBot;
     const botReal = boundaryGroupBot.getObjectByName("boundary-real");
-    const botCup = boundaryGroupBot.getObjectByName("boundary-cup");
-    const botExt = boundaryGroupBot.getObjectByName("boundary-ext");
     if (botReal) botReal.visible = showReal;
-    if (botCup) botCup.visible = showCup;
-    if (botExt) botExt.visible = showExt;
-    boundaryGroupBot.traverse(child => {
-      if (child.name === "boundary-theo") child.visible = showTheo;
-    });
+  }
+
+  if (boundaryGroupZero) {
+    boundaryGroupZero.visible = showZeroBoundary;
   }
 }
 
@@ -1041,7 +1044,7 @@ function setupUI() {
   });
 
   // 2. Contours
-  ["toggle-boundary-top", "toggle-boundary-bot"].forEach(id => {
+  ["toggle-boundary-top", "toggle-boundary-bot", "toggle-boundary-zero"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", updateLayerVisibility);
   });
@@ -1087,6 +1090,13 @@ function setupUI() {
   if (toggleFloor) {
     toggleFloor.addEventListener("change", () => {
       if (floorGridGroup) floorGridGroup.visible = toggleFloor.checked;
+    });
+  }
+
+  const toggleZero = document.getElementById("toggle-zero-grid");
+  if (toggleZero) {
+    toggleZero.addEventListener("change", () => {
+      if (zeroGridGroup) zeroGridGroup.visible = toggleZero.checked;
     });
   }
 
@@ -1176,7 +1186,7 @@ function setupUI() {
       renderer.render(scene, camera);
       const dataURL = renderer.domElement.toDataURL("image/png");
       const a = document.createElement("a");
-      a.download = "Painleve1_Hamilton_Separatrix_3D.png";
+      a.download = "Painleve1_Separatrice_Extended_Minus35_15_3D.png";
       a.href = dataURL;
       a.click();
       renderer.setPixelRatio(prevRatio);
@@ -1188,14 +1198,14 @@ function setupUI() {
     btn.addEventListener("click", () => {
       const camType = btn.getAttribute("data-cam");
       controls.target.copy(BOX_CENTER);
-      const dist = 60;
+      const dist = 65;
 
       if (camType === "perspective") {
         camera.up.set(0, 1, 0);
-        camera.position.set(-42, 38, 62);
+        camera.position.set(-46, 42, 68);
       } else if (camType === "diag") {
         camera.up.set(0, 1, 0);
-        camera.position.set(36, 32, 58);
+        camera.position.set(40, 36, 65);
       } else if (camType === "top") {
         camera.up.set(0, 0, -1);
         camera.position.set(BOX_CENTER.x, BOX_CENTER.y + dist, BOX_CENTER.z);

@@ -1,4 +1,4 @@
-/* Style moderne et épuré pour WEB_VIEWER_3 */
+/* Style moderne et épuré pour WEB_VIEWER_HAMILTON */
 :root {
   --bg-color: #ffffff;
   --panel-bg: rgba(255, 255, 255, 0.90);
@@ -7,7 +7,7 @@
   --text-muted: #64748b;
   --accent-blue: #2563eb;
   --accent-theo: #dc2626; /* Modèle autonome gelé rouge */
-  --accent-amber: #f59e0b; /* Arête Selle or/ambre */
+  --accent-amber: #f59e0b; /* Tasse or / ambre */
   --accent-red: #dc2626;
   --accent-green: #10b981;
 }
@@ -41,7 +41,7 @@ body {
   position: absolute;
   top: 20px;
   right: 20px;
-  width: 330px;
+  width: 340px;
   max-height: calc(100vh - 40px);
   background: var(--panel-bg);
   backdrop-filter: blur(14px);
@@ -305,4 +305,3 @@ body {
 .btn-accent:hover {
   background: #1e293b !important;
 }
-
